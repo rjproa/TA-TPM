@@ -10,3 +10,8 @@
 .cxx
 local.properties
 app/google-services.json
+
+# Claves de firma: nunca se suben. La única excepción es app/debug.keystore.
+*.jks
+*.b64
+keystore.properties

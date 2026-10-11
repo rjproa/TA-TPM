@@ -1,0 +1,4 @@
+<resources>
+    <!-- La variante de desarrollo se instala junto a la oficial; el nombre las distingue. -->
+    <string name="app_name">Yunta Dev</string>
+</resources>
