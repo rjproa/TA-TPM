@@ -39,7 +39,7 @@ Para la entrega del 15 de octubre, el avance de la app es la fase 0.
 | Entorno | Android Studio 2026.1.4, JDK 21 |
 | Costo | Cero. Ningún servicio requiere tarjeta |
 
-Versiones confirmadas: Compose BOM 2026.09.00, Room 2.8.5, Lifecycle 2.11.0, Kotlin 2.4.10. Las de Navigation, Retrofit, Vico, WorkManager y el plugin de Gradle se fijan en la fase 0 con las que genere Android Studio y se anotan en `gradle/libs.versions.toml`.
+Versiones en uso desde la fase 0: plugin de Gradle 9.4.0, Gradle 9.6.0, Kotlin 2.2.10, Compose BOM 2026.09.00, Navigation 2.10.2 y Lifecycle 2.11.0. Las de Room (2.8.5 prevista), Retrofit, Vico y WorkManager se fijan en la fase que las incorpora. Todas quedan anotadas en `gradle/libs.versions.toml`.
 
 ## Convenciones
 
