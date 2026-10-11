@@ -1,0 +1,149 @@
+# CERT: cada push a develop pasa por seguridad y, si todo está bien, publica una versión candidata.
+# Ese mismo instalador es el que después se promueve a producción sin volver a compilar.
+name: cert
+
+on:
+  push:
+    branches: [develop]
+
+# Las certificaciones se ejecutan una tras otra, sin cancelarse.
+concurrency:
+  group: cert
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  secretos:
+    name: Seguridad - secretos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Ejecutar Gitleaks
+        run: .github/scripts/gitleaks.sh
+
+  lint:
+    name: Seguridad - configuración de la app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Ejecutar Android Lint
+        run: ./gradlew --console=plain lintRelease
+      - name: Guardar el reporte
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reporte-lint
+          path: app/build/reports/lint-results-release.*
+
+  codeql:
+    name: Seguridad - análisis de código
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: java-kotlin
+          build-mode: manual
+          queries: security-extended
+      # CodeQL necesita observar la compilación completa: sin cachés ni proceso en segundo plano.
+      - name: Compilar para el análisis
+        run: ./gradlew --console=plain --no-daemon --no-build-cache --no-configuration-cache assembleRelease
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:java-kotlin
+          output: resultados-codeql
+      - name: Detener si hay hallazgos graves
+        run: .github/scripts/revisar-sarif.sh resultados-codeql
+
+  publicar:
+    name: Compilar, firmar y publicar la candidata
+    runs-on: ubuntu-latest
+    needs: [secretos, lint, codeql]
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION_CODE: ${{ github.run_number }}
+      BUILD_RAMA: ${{ github.ref_name }}
+      BUILD_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Calcular la versión
+        id: version
+        run: |
+          VERSION=$(grep '^yunta.versionName=' gradle.properties | cut -d= -f2)
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::La versión $VERSION ya es oficial. Sube yunta.versionName en gradle.properties."
+            exit 1
+          fi
+          ETIQUETA="v$VERSION-rc.$GITHUB_RUN_NUMBER"
+          # Si se reintenta la misma ejecución, la etiqueta anterior ya existe.
+          if [ "$GITHUB_RUN_ATTEMPT" -gt 1 ]; then ETIQUETA="$ETIQUETA.$GITHUB_RUN_ATTEMPT"; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "etiqueta=$ETIQUETA" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Preparar la clave de firma
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Falta el secreto KEYSTORE_BASE64 en el repositorio."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/yunta-release.jks"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/yunta-release.jks" >> "$GITHUB_ENV"
+      - name: Probar y compilar
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew --console=plain testDebugUnitTest assembleRelease
+      - name: Borrar la clave de firma
+        if: always()
+        run: rm -f "$RUNNER_TEMP/yunta-release.jks"
+      - name: Verificar la firma del instalador
+        run: |
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner
+          "$APKSIGNER" verify --verbose app/build/outputs/apk/release/app-release.apk
+      - name: Publicar la versión candidata
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ETIQUETA: ${{ steps.version.outputs.etiqueta }}
+        run: |
+          INSTALADOR="yunta-$VERSION.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$INSTALADOR"
+          sha256sum "$INSTALADOR" > "$INSTALADOR.sha256"
+
+          NOTAS="Versión candidata de certificación. Pasó las revisiones de secretos, configuración y código.
+
+          - Commit: \`$GITHUB_SHA\`
+          - Compilación: $VERSION_CODE
+          - SHA-256: \`$(cut -d' ' -f1 "$INSTALADOR.sha256")\`"
+
+          gh release create "$ETIQUETA" "$INSTALADOR" "$INSTALADOR.sha256" \
+            --prerelease --target "$GITHUB_SHA" \
+            --title "Yunta $VERSION (candidata $GITHUB_RUN_NUMBER)" \
+            --notes "$NOTAS" --generate-notes
+
+          echo "Candidata publicada: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$ETIQUETA" >> "$GITHUB_STEP_SUMMARY"

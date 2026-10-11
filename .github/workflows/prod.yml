@@ -1,0 +1,65 @@
+# PROD: cada push a main promueve a versión oficial el instalador que ya se certificó.
+# No compila nada: toma el archivo de la versión candidata, lo verifica y lo vuelve a publicar.
+name: prod
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  localizar:
+    name: Localizar la versión certificada
+    runs-on: ubuntu-latest
+    outputs:
+      candidata: ${{ steps.buscar.outputs.candidata }}
+      version: ${{ steps.buscar.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Buscar la candidata con el mismo código que main
+        id: buscar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/localizar-candidata.sh
+
+  promover:
+    name: Promover a versión oficial
+    runs-on: ubuntu-latest
+    needs: localizar
+    # Este entorno exige la aprobación manual configurada en GitHub.
+    environment: produccion
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      CANDIDATA: ${{ needs.localizar.outputs.candidata }}
+      VERSION: ${{ needs.localizar.outputs.version }}
+    steps:
+      - name: Descargar el instalador certificado
+        run: gh release download "$CANDIDATA" --dir instalador
+      - name: Verificar que el archivo no cambió
+        working-directory: instalador
+        run: sha256sum -c ./*.sha256
+      - name: Publicar la versión oficial
+        run: |
+          NOTAS="Versión oficial. Es el mismo instalador de la candidata \`$CANDIDATA\`, promovido sin recompilar.
+
+          - Commit de main: \`$GITHUB_SHA\`
+          - SHA-256: \`$(cut -d' ' -f1 instalador/*.sha256)\`"
+
+          gh release create "v$VERSION" instalador/* \
+            --target "$GITHUB_SHA" --latest \
+            --title "Yunta $VERSION" \
+            --notes "$NOTAS" --generate-notes
+
+          echo "Versión oficial: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/v$VERSION" >> "$GITHUB_STEP_SUMMARY"

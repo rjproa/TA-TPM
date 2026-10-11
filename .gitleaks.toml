@@ -1,0 +1,6 @@
+# Configuración de Gitleaks: busca claves, tokens y contraseñas en el historial de Git.
+# Usa las reglas por defecto. Si aparece un falso positivo, se documenta aquí como excepción.
+title = "Yunta"
+
+[extend]
+useDefault = true
