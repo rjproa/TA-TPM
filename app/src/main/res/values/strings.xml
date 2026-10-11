@@ -1,0 +1,42 @@
+<resources>
+    <string name="app_name">Yunta</string>
+
+    <string name="nav_inicio">Inicio</string>
+    <string name="nav_historial">Historial</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_asesor">Yunta</string>
+    <string name="nav_ajustes">Ajustes</string>
+    <string name="accion_atras">Atrás</string>
+
+    <string name="inicio_saludo">Hola, este es tu mes</string>
+    <string name="inicio_disponible">Disponible</string>
+    <string name="inicio_ingresos">Ingresos</string>
+    <string name="inicio_gastos">Gastos</string>
+    <string name="inicio_ultimos_movimientos">Últimos movimientos</string>
+    <string name="inicio_sin_movimientos">Aún no registras movimientos este mes.</string>
+    <string name="inicio_registrar">Registrar</string>
+
+    <string name="formulario_titulo">Nuevo movimiento</string>
+    <string name="formulario_tipo_gasto">Gasto</string>
+    <string name="formulario_tipo_ingreso">Ingreso</string>
+    <string name="formulario_monto">Monto</string>
+    <string name="formulario_categoria">Categoría</string>
+    <string name="formulario_medio_pago">Medio de pago</string>
+    <string name="formulario_nota">Nota (opcional)</string>
+    <string name="formulario_guardar">Guardar</string>
+    <string name="formulario_guardado">Movimiento registrado</string>
+    <string name="error_monto_vacio">Ingresa un monto</string>
+    <string name="error_monto_invalido">Usa solo números, con dos decimales como máximo</string>
+    <string name="error_monto_cero">El monto debe ser mayor que cero</string>
+    <string name="error_categoria">Elige una categoría</string>
+
+    <string name="medio_efectivo">Efectivo</string>
+    <string name="medio_yape_plin">Yape/Plin</string>
+    <string name="medio_tarjeta">Tarjeta</string>
+
+    <string name="en_construccion_mensaje">Esta sección llegará en una próxima fase.</string>
+    <string name="historial_descripcion">Aquí verás todos tus movimientos, con filtros por fecha, categoría y medio de pago.</string>
+    <string name="dashboard_descripcion">Aquí verás gráficos de tus gastos por categoría y su evolución en el tiempo.</string>
+    <string name="asesor_descripcion">Aquí podrás conversar con Yunta y preguntarle antes de comprar.</string>
+    <string name="ajustes_descripcion">Aquí configurarás tu presupuesto, categorías y recordatorios.</string>
+</resources>
